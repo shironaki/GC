@@ -32,6 +32,15 @@ try {
     const x=c.getContext('2d').getImageData(Math.floor(c.width/2),Math.floor(c.height/2),1,1).data;
     return x[3]===255;
   });
+  const sceneColors = await page.evaluate(() => {
+    const c=document.querySelector('#world'), data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+    const colors=new Set();
+    for(let y=0;y<c.height;y+=13)for(let x=0;x<c.width;x+=13){
+      const i=(y*c.width+x)*4;colors.add(data[i]+','+data[i+1]+','+data[i+2]);
+    }
+    return colors.size;
+  });
+  if(sceneColors<28) throw new Error('Urban scene render looks visually empty or flat: '+sceneColors+' sampled colors');
   if (!(await page.locator('#sprint').isVisible())) throw new Error('Mobile sprint control is missing');
   if (!(await page.locator('#minimap').isVisible())) throw new Error('City minimap is missing');
   await page.waitForFunction(() => { const m=document.querySelector('#minimap'); return m.getContext('2d').getImageData(20,20,1,1).data[3] > 0; });
