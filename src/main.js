@@ -39,7 +39,7 @@ const state={
 };
 const player={x:190,y:200,vx:0,vy:0,angle:0,walk:0,attack:0,attackCooldown:0,invulnerable:0,inCar:null};
 const camera={x:player.x,y:player.y};
-const world={buildings:[],cars:[],civilians:[],gangs:[],police:[],decor:[],roads:[]};
+const world={buildings:[],cars:[],civilians:[],gangs:[],police:[],crew:[],decor:[],roads:[]};
 let width=0,height=0,scale=1,lastTime=0,saveClock=0,toastClock=0,hudClock=0,gamePaused=false;
 let joystick={active:false,pointer:null,x:0,y:0};
 let sprintHeld=false;
@@ -56,6 +56,8 @@ function makeWorld(){
  for(let i=0;i<48;i++)world.civilians.push({x:rand(80,2020),y:rand(80,1580),phase:rand(0,7),shirt:['#8c9b91','#b28b62','#7a8290','#9c6557','#667e8b'][i%5],speed:rand(.12,.3)});
  world.gangs=[];
  for(let i=0;i<9;i++)world.gangs.push({id:'gang-'+i,x:520+(i%3)*95,y:690+Math.floor(i/3)*95,hp:65,maxHp:65,alive:true,phase:rand(0,7)});
+ world.crew=[];
+ for(let i=0;i<state.crew;i++)world.crew.push({x:player.x-24*(i+1),y:player.y+22,hp:100,cooldown:rand(0,.5)});
  world.police=[];
  world.decor=[];
  for(let i=0;i<90;i++)world.decor.push({x:rand(20,WORLD.w-20),y:rand(20,WORLD.h-20),type:i%3});
@@ -123,7 +125,7 @@ function drawCar(car){
 }
 function drawHuman(entity,kind='civilian'){
  const p=project(entity.x,entity.y);ctx.fillStyle='#0007';ctx.beginPath();ctx.ellipse(p.x,p.y+7,8,4,0,0,7);ctx.fill();
- const color=kind==='gang'?'#a54c3e':kind==='police'?'#476887':entity.shirt||'#849187';
+ const color=kind==='gang'?'#a54c3e':kind==='police'?'#476887':kind==='crew'?'#789b70':entity.shirt||'#849187';
  ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(p.x-6,p.y-13,12,19,4);ctx.fill();
  ctx.fillStyle='#c99673';ctx.beginPath();ctx.arc(p.x,p.y-17,5,0,7);ctx.fill();
  if(kind==='gang'||kind==='police'){ctx.fillStyle=kind==='gang'?'#e5b65b':'#b9c8d3';ctx.fillRect(p.x-7,p.y-25,14,3)}
@@ -139,6 +141,7 @@ function drawMinimap(){
  for(const b of world.buildings){mapCtx.fillStyle=b.owned?'#e2b969':'#b6c0b4';mapCtx.fillRect(b.x*sx,b.y*sy,Math.max(2,b.w*sx),Math.max(2,b.h*sy))}
  for(const c of world.cars){mapCtx.fillStyle='#7e9aa4';mapCtx.fillRect(c.x*sx-1,c.y*sy-1,2,2)}
  for(const g of world.gangs)if(g.alive){mapCtx.fillStyle='#d56c55';mapCtx.fillRect(g.x*sx-1,g.y*sy-1,3,3)}
+ for(const mate of world.crew){mapCtx.fillStyle='#8dbb79';mapCtx.fillRect(mate.x*sx-1,mate.y*sy-1,3,3)}
  mapCtx.fillStyle='#f3d27f';mapCtx.beginPath();mapCtx.arc(player.x*sx,player.y*sy,3,0,Math.PI*2);mapCtx.fill();
  mapCtx.strokeStyle='#f3d27f';mapCtx.lineWidth=1;mapCtx.strokeRect(Math.max(0,(camera.x-360)*sx),Math.max(0,(camera.y-360)*sy),Math.min(w,720*sx),Math.min(h,720*sy));
 }
@@ -150,6 +153,7 @@ function render(){
  for(const p of world.civilians)if(Math.abs(p.x-camera.x)<900&&Math.abs(p.y-camera.y)<900)items.push({y:p.y,draw:()=>drawHuman(p)});
  for(const g of world.gangs)if(g.alive)items.push({y:g.y,draw:()=>drawHuman(g,'gang')});
  for(const cop of world.police)items.push({y:cop.y,draw:()=>drawHuman(cop,'police')});
+ for(const mate of world.crew)items.push({y:mate.y,draw:()=>drawHuman(mate,'crew')});
  items.push({y:player.y,draw:()=>drawHuman(player)});items.sort((a,b)=>a.y-b.y);for(const item of items)item.draw();
 }
 function currentMission(){return MISSIONS[state.mission]||null}
@@ -211,7 +215,7 @@ function openMenu(){
  '<button class="choice" id="continue"><strong>Продолжить</strong><small>Вернуться в город</small></button>'+
  '<button class="choice" id="reset"><strong>Сбросить прогресс</strong><small>Начать новую игру</small></button></div>');
  $('continue').onclick=closeModal;$('save').onclick=()=>{save();notify('Игра сохранена')};
- $('crew').onclick=()=>{if(state.money<200){notify('Недостаточно денег');return}state.money-=200;state.crew++;state.inventory.push('Наёмник');save();notify('Боец нанят');openMenu()};
+ $('crew').onclick=()=>{if(state.money<200){notify('Недостаточно денег');return}state.money-=200;state.crew++;world.crew.push({x:player.x-28,y:player.y+26,hp:100,cooldown:.4});state.inventory.push('Наёмник');save();notify('Боец нанят и присоединился к отряду');openMenu()};
  $('medkit').onclick=()=>{if(state.medkits<1){notify('В запасе нет аптечек');return}if(state.health>=100){notify('Здоровье уже полное');return}state.medkits--;state.health=Math.min(100,state.health+45);save();notify('Аптечка использована');openMenu()};
  $('buy-medkit').onclick=()=>{if(state.money<80){notify('Недостаточно денег');return}state.money-=80;state.medkits++;save();notify('Аптечка куплена');openMenu()};
  $('day').onclick=()=>{const amount=world.buildings.filter(b=>b.owned).reduce((n,b)=>n+b.income*b.level,0);state.money+=amount;state.day++;state.health=Math.min(100,state.health+10);state.stamina=100;state.wanted=Math.max(0,state.wanted-1);save();notify('Новый день · доход $'+amount);openMenu()};
@@ -236,6 +240,7 @@ function update(dt){
  player.attack=Math.max(0,player.attack-dt);player.attackCooldown=Math.max(0,player.attackCooldown-dt);player.invulnerable=Math.max(0,player.invulnerable-dt);
  for(const civilian of world.civilians){civilian.phase+=dt;if(Math.sin(civilian.phase)>.98){civilian.x=clamp(civilian.x+Math.cos(civilian.phase)*civilian.speed*8,30,WORLD.w-30);civilian.y=clamp(civilian.y+Math.sin(civilian.phase)*civilian.speed*8,30,WORLD.h-30)}}
  for(const g of world.gangs){if(!g.alive)continue;const d=dist(player,g);if(d<240&&!car){const a=Math.atan2(player.y-g.y,player.x-g.x);g.x+=Math.cos(a)*.7;g.y+=Math.sin(a)*.7;if(d<25&&player.invulnerable<=0){state.health-=6;player.invulnerable=.8;if(state.health<=0)knockOut()}}}
+ for(const mate of world.crew){mate.cooldown=Math.max(0,mate.cooldown-dt);const follow=dist(player,mate);if(follow>48){const a=Math.atan2(player.y-mate.y,player.x-mate.x);const step=Math.min(follow-38,1.05)*dt*60;mate.x+=Math.cos(a)*step;mate.y+=Math.sin(a)*step}const enemy=world.gangs.filter(g=>g.alive&&dist(mate,g)<105).sort((a,b)=>dist(mate,a)-dist(mate,b))[0];if(enemy&&mate.cooldown<=0){enemy.hp-=18;mate.cooldown=1.1;if(enemy.hp<=0){enemy.alive=false;state.kills++;state.money+=50;state.rep++;notify('Твой боец победил противника · +$50');save()}}}
  updatePolice(dt,car);
  camera.x+=(player.x-camera.x)*Math.min(1,dt*5);camera.y+=(player.y-camera.y)*Math.min(1,dt*5);
  saveClock+=dt;if(saveClock>18){saveClock=0;save()}
