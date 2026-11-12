@@ -38,7 +38,7 @@ const state={
 const player={x:190,y:200,vx:0,vy:0,angle:0,walk:0,attack:0,attackCooldown:0,invulnerable:0,inCar:null};
 const camera={x:player.x,y:player.y};
 const world={buildings:[],cars:[],civilians:[],gangs:[],police:[],decor:[],roads:[]};
-let width=0,height=0,scale=1,lastTime=0,saveClock=0,toastClock=0,gamePaused=false;
+let width=0,height=0,scale=1,lastTime=0,saveClock=0,toastClock=0,hudClock=0,gamePaused=false;
 let joystick={active:false,pointer:null,x:0,y:0};
 let sprintHeld=false;
 const keys=new Set();
@@ -221,7 +221,7 @@ function updatePolice(dt,car){
  for(let i=world.police.length-1;i>=0;i--){const cop=world.police[i],d=dist(player,cop),a=Math.atan2(player.y-cop.y,player.x-cop.x);cop.x+=Math.cos(a)*(car?1.3:.55);cop.y+=Math.sin(a)*(car?1.3:.55);cop.phase+=dt;if(d<24&&player.invulnerable<=0){state.health-=4;player.invulnerable=1;if(state.health<=0)knockOut()}if(state.wanted===0&&d>500)world.police.splice(i,1)}
 }
 function knockOut(){state.health=40;state.money=Math.max(0,state.money-120);state.wanted=0;if(player.inCar)exitCar();player.x=190;player.y=200;world.police=[];notify('Тебя вырубили. Потеряно $120');save()}
-function frame(time){const dt=Math.min(.04,(time-lastTime)/1000||0);lastTime=time;if(!gamePaused)update(dt);render();updateHud();requestAnimationFrame(frame)}
+function frame(time){const dt=Math.min(.04,(time-lastTime)/1000||0);lastTime=time;if(!gamePaused)update(dt);render();hudClock+=dt;if(hudClock>=.2){hudClock=0;updateHud()}requestAnimationFrame(frame)}
 function setupJoystick(){
  const pad=$('joystick'),knob=$('joystick-knob');
  const set=(x,y)=>{const max=39,len=Math.hypot(x,y)||1,k=Math.min(1,max/len);joystick.x=x*k/max;joystick.y=y*k/max;knob.style.transform='translate('+x*k+'px,'+y*k+'px)'};
