@@ -40,6 +40,8 @@ try {
   await page.locator('#medkit').click();
   await page.locator('#buy-medkit').waitFor();
   await page.locator('#buy-medkit').click();
+  await page.locator('#crew').click();
+  if (!(await page.locator('#modal-content').innerText()).includes('Команда: 1')) throw new Error('Hired crew member was not added');
   await page.locator('#save').click();
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('gcr-save-v2')));
   if (!persisted || !persisted.state || !Array.isArray(persisted.state.inventory)) throw new Error('Save data was not written');
