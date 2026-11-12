@@ -68,7 +68,17 @@ function save(){
 }
 function load(){
  try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;const data=JSON.parse(raw);if(!data||!data.state)return;
- Object.assign(state,data.state);if(data.player){player.x=clamp(Number(data.player.x)||190,20,WORLD.w-20);player.y=clamp(Number(data.player.y)||200,20,WORLD.h-20)}
+ Object.assign(state,data.state);
+ const numeric={money:[0,99999999],health:[0,100],stamina:[0,100],ammo:[0,9999],medkits:[0,99],rep:[0,999],day:[1,99999],wanted:[0,5],crew:[0,99],kills:[0,99999],mission:[0,MISSIONS.length],carRepairs:[0,99999]};
+ for(const [key,[min,max]] of Object.entries(numeric)){const value=Number(state[key]);state[key]=clamp(Number.isFinite(value)?value:min,min,max)}
+ const buildingIds=BUILDING_SEEDS.map(item=>item[0]);
+ state.owned=Array.isArray(state.owned)?[...new Set(state.owned.filter(id=>buildingIds.includes(id)))]:[];
+ state.unlocked=Array.isArray(state.unlocked)?[...new Set(state.unlocked.filter(id=>DISTRICTS.some(d=>d.id===id)))]:['east'];
+ if(!state.unlocked.includes('east'))state.unlocked.unshift('east');
+ state.inventory=Array.isArray(state.inventory)?state.inventory.filter(item=>typeof item==='string').slice(0,100):['Пистолет','Телефон','Ключи'];
+ if(!state.inventory.includes('Пистолет'))state.inventory.unshift('Пистолет');
+ if(!state.inventory.includes(state.equipped))state.equipped='Пистолет';
+ if(data.player){player.x=clamp(Number(data.player.x)||190,20,WORLD.w-20);player.y=clamp(Number(data.player.y)||200,20,WORLD.h-20)}
  }catch(error){console.warn('Save data was ignored',error)}
 }
 load();makeWorld();
