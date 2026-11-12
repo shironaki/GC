@@ -157,7 +157,7 @@ function drawGround(){
  // Crosswalks at street intersections.
  for(let y=90;y<WORLD.h;y+=300)for(let x=100;x<WORLD.w;x+=350){
    for(let k=0;k<7;k++){
-     const p=project(x-30+k*10,y+126),q=project(x-30+k*10,y+148);
+     const p=project(x+18+k*8,y+22),q=project(x+18+k*8,y+88);
      ctx.strokeStyle='#e0d9c4a8';ctx.lineWidth=5*p.depth;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();
    }
  }
