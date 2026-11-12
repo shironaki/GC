@@ -5,8 +5,9 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#10171b",
-  "theme_color": "#111820",
-  "lang": "ru"
+  "theme_color": "#10171b",
+  "lang": "ru",
+  "icons": []
 }
