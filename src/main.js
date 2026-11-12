@@ -273,10 +273,6 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});
 if('serviceWorker' in navigator&&location.protocol!=='file:'){addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(error=>console.warn('Offline mode unavailable',error)))}
 $('loading').classList.add('done');setTimeout(()=>$('loading').remove(),400);
 updateHud();requestAnimationFrame(frame);
-+Math.floor(state.money)+'</b><br>❤️ '+Math.ceil(state.health)+' &nbsp; ⚡ '+Math.ceil(state.stamina)+'<br>⭐ '+state.rep+' &nbsp; 🔫 '+state.ammo+'<br>☠ '+state.wanted+' / 5';
- const m=currentMission();$('mission-card').innerHTML=m?'<strong>'+m.title+'</strong>'+m.text:'<strong>СВОБОДНАЯ ИГРА</strong>Город открыт. Зарабатывай, развивай бизнес и исследуй районы.';
- const d=DISTRICTS.find(v=>state.unlocked.includes(v.id)&&player.x>=v.bounds.x&&player.x<v.bounds.x+v.bounds.w&&player.y>=v.bounds.y&&player.y<v.bounds.y+v.bounds.h)||DISTRICTS[0];$('district-tag').textContent=d.name;
-}
 function currentDistrict(){return DISTRICTS.find(d=>player.x>=d.bounds.x&&player.x<d.bounds.x+d.bounds.w&&player.y>=d.bounds.y&&player.y<d.bounds.y+d.bounds.h)||DISTRICTS[0]}
 function unlockedAt(x,y){const d=DISTRICTS.find(v=>x>=v.bounds.x&&x<v.bounds.x+v.bounds.w&&y>=v.bounds.y&&y<v.bounds.y+v.bounds.h);return !d||state.unlocked.includes(d.id)}
 function collides(x,y){for(const b of world.buildings){if(x>b.x-12&&x<b.x+b.w+12&&y>b.y-12&&y<b.y+b.h+12)return true}return false}
@@ -288,7 +284,7 @@ function interact(){
  if(target.type==='gang'){melee(target.object);return}
  const b=target.object;
  if(b.id==='garage'&&state.mission===0){finishMission();return}
- if(b.id==='warehouse'&&state.mission===1){state.money+=250;finishMission();return}
+ if(b.id==='warehouse'&&state.mission===1){finishMission();return}
  if(b.id==='safehouse'&&state.mission===5){finishMission();return}
  if(b.id==='docks'&&state.mission===6){finishMission();return}
  openBusiness(b);
