@@ -160,7 +160,7 @@ function render(){
 function currentMission(){return MISSIONS[state.mission]||null}
 function notify(message){const el=$('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toastClock);toastClock=setTimeout(()=>el.classList.remove('visible'),2300)}
 function updateHud(){
- $('resources').innerHTML='💵 <b>
+ $('resources').innerHTML='💵 <b>$'+Math.floor(state.money)+'</b><br>❤️ '+Math.ceil(state.health)+' &nbsp; ⚡ '+Math.ceil(state.stamina)+'<br>⭐ '+state.rep+' &nbsp; 🔫 '+state.ammo+'<br>☠ '+state.wanted+' / 5';
  const m=currentMission();$('mission-card').innerHTML=m?'<strong>'+m.title+'</strong>'+m.text:'<strong>СВОБОДНАЯ ИГРА</strong>Город открыт. Зарабатывай, развивай бизнес и исследуй районы.';
  const d=DISTRICTS.find(v=>state.unlocked.includes(v.id)&&player.x>=v.bounds.x&&player.x<v.bounds.x+v.bounds.w&&player.y>=v.bounds.y&&player.y<v.bounds.y+v.bounds.h)||DISTRICTS[0];$('district-tag').textContent=d.name;
 }
