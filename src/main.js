@@ -127,18 +127,18 @@ function render(){
  for(const cop of world.police)items.push({y:cop.y,draw:()=>drawHuman(cop,'police')});
  items.push({y:player.y,draw:()=>drawHuman(player)});items.sort((a,b)=>a.y-b.y);for(const item of items)item.draw();
 }
-function currentMission(){return MISSIONS[Math.min(state.mission,MISSIONS.length-1)]}
+function currentMission(){return MISSIONS[state.mission]||null}
 function notify(message){const el=$('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toastClock);toastClock=setTimeout(()=>el.classList.remove('visible'),2300)}
 function updateHud(){
  $('resources').innerHTML='💵 <b>$'+Math.floor(state.money)+'</b><br>❤️ '+Math.ceil(state.health)+' &nbsp; ⭐ '+state.rep+'<br>🔫 '+state.ammo+' &nbsp; ☠ '+state.wanted;
- const m=currentMission();$('mission-card').innerHTML='<strong>'+m.title+'</strong>'+m.text;
+ const m=currentMission();$('mission-card').innerHTML=m?'<strong>'+m.title+'</strong>'+m.text:'<strong>СВОБОДНАЯ ИГРА</strong>Город открыт. Зарабатывай, развивай бизнес и исследуй районы.';
  const d=DISTRICTS.find(v=>state.unlocked.includes(v.id)&&player.x>=v.bounds.x&&player.x<v.bounds.x+v.bounds.w&&player.y>=v.bounds.y&&player.y<v.bounds.y+v.bounds.h)||DISTRICTS[0];$('district-tag').textContent=d.name;
 }
 function currentDistrict(){return DISTRICTS.find(d=>player.x>=d.bounds.x&&player.x<d.bounds.x+d.bounds.w&&player.y>=d.bounds.y&&player.y<d.bounds.y+d.bounds.h)||DISTRICTS[0]}
 function unlockedAt(x,y){const d=DISTRICTS.find(v=>x>=v.bounds.x&&x<v.bounds.x+v.bounds.w&&y>=v.bounds.y&&y<v.bounds.y+v.bounds.h);return !d||state.unlocked.includes(d.id)}
 function collides(x,y){for(const b of world.buildings){if(x>b.x-12&&x<b.x+b.w+12&&y>b.y-12&&y<b.y+b.h+12)return true}return false}
 function nearestTarget(max=105){const candidates=[];for(const b of world.buildings)candidates.push({type:'building',object:b,d:dist(player,{x:b.x+b.w/2,y:b.y+b.h/2})});for(const c of world.cars)candidates.push({type:'car',object:c,d:dist(player,c)});for(const g of world.gangs)if(g.alive)candidates.push({type:'gang',object:g,d:dist(player,g)});return candidates.filter(v=>v.d<max).sort((a,b)=>a.d-b.d)[0]||null}
-function finishMission(){const m=currentMission();state.money+=m.reward;state.rep++;state.mission=Math.min(state.mission+1,MISSIONS.length-1);if(state.rep>=4&&!state.unlocked.includes('downtown')){state.unlocked.push('downtown');notify('Downtown открыт! +$'+m.reward)}else notify('Задание выполнено · +$'+m.reward);if(state.mission===4&&state.rep>=4){state.money+=MISSIONS[4].reward;state.rep++;state.mission=5;notify('Downtown открыт · задание репутации выполнено')}if(state.rep>=6&&!state.unlocked.includes('harbor')){state.unlocked.push('harbor');notify('Harbor открыт!')}save();updateHud()}
+function finishMission(){const m=currentMission();state.money+=m.reward;state.rep++;state.mission=Math.min(state.mission+1,MISSIONS.length);if(state.rep>=4&&!state.unlocked.includes('downtown')){state.unlocked.push('downtown');notify('Downtown открыт! +$'+m.reward)}else notify('Задание выполнено · +$'+m.reward);if(state.mission===4&&state.rep>=4){state.money+=MISSIONS[4].reward;state.rep++;state.mission=5;notify('Downtown открыт · задание репутации выполнено')}if(state.rep>=6&&!state.unlocked.includes('harbor')){state.unlocked.push('harbor');notify('Harbor открыт!')}save();updateHud()}
 function interact(){
  const target=nearestTarget();if(!target){notify('Подойди ближе к объекту');return}
  if(target.type==='car'){if(!player.inCar){player.inCar=target.object.id;target.object.occupied=true;player.x=target.object.x;player.y=target.object.y;notify('Ты за рулём')}else exitCar();return}
