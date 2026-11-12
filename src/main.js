@@ -137,6 +137,23 @@ function drawGround(){
    ctx.fillStyle=i%3?'#b7ad9710':'#05090a24';ctx.beginPath();ctx.ellipse(p.x,p.y,3*p.depth,1.5*p.depth,-.3,0,Math.PI*2);ctx.fill();
    if(i%13===0){ctx.strokeStyle='#aaa18a55';ctx.lineWidth=p.depth;ctx.beginPath();ctx.arc(p.x,p.y,5*p.depth,0,Math.PI*2);ctx.stroke()}
  }
+ // Rain-darkened asphalt puddles with broken amber and neon reflections.
+ for(let i=0;i<30;i++){
+   const wx=((i*137+Math.floor(camera.x/120)*59)%WORLD.w),wy=((i*211+Math.floor(camera.y/120)*83)%WORLD.h);
+   const p=project(wx,wy),z=p.depth,rx=(9+(i%5)*4)*z,ry=(2+(i%3))*z;
+   if(p.x<-rx-4||p.x>width+rx+4||p.y<-ry-4||p.y>height+ry+4)continue;
+   ctx.fillStyle='#080e10a8';ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,-.12,0,Math.PI*2);ctx.fill();
+   const reflection=ctx.createLinearGradient(p.x-rx,p.y,p.x+rx,p.y);
+   reflection.addColorStop(0,'#e2b56b00');reflection.addColorStop(.48,i%3?'#e5bd7440':'#d06b6940');reflection.addColorStop(1,'#e2b56b00');
+   ctx.fillStyle=reflection;ctx.beginPath();ctx.ellipse(p.x,p.y-ry*.25,rx*.82,ry*.42,-.12,0,Math.PI*2);ctx.fill();
+ }
+ // Fine rain streaks add movement without external textures.
+ const rainTime=performance.now()*.055;
+ ctx.strokeStyle='#c5d3d522';ctx.lineWidth=1;
+ for(let i=0;i<58;i++){
+   const x=(i*83+rainTime*1.7)%(width+30)-15,y=(i*137+rainTime*3.4)%(height+30)-15;
+   ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-3,y+9);ctx.stroke();
+ }
  // Crosswalks at street intersections.
  for(let y=90;y<WORLD.h;y+=300)for(let x=100;x<WORLD.w;x+=350){
    for(let k=0;k<7;k++){
