@@ -48,6 +48,13 @@ try {
   await page.locator('#continue').click();
   await page.reload({waitUntil:'networkidle'});
   await page.waitForFunction(() => document.querySelector('#world')?.width > 0);
+  await page.evaluate(() => navigator.serviceWorker?.ready);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(() => !!navigator.serviceWorker?.controller);
+  await page.context().setOffline(true);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForSelector('#world');
+  await page.context().setOffline(false);
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(700);
   await page.keyboard.up('ArrowRight');
