@@ -12,7 +12,7 @@ for (const id of ['world','resources','mission-card','district-tag','joystick','
 for (const path of ['./styles.css','./manifest.webmanifest','./src/main.js']) {
   assert.ok(html.includes(path), 'HTML does not reference ' + path);
 }
-for (const path of ['./','./index.html','./styles.css','./manifest.webmanifest','./src/main.js']) {
+for (const path of ['./index.html','./styles.css','./manifest.webmanifest','./src/main.js']) {
   assert.ok(existsSync(path.replace(/^\.\//,'')), 'Missing offline shell file ' + path);
 }
 for (const token of ['function update(','function render(','function interact(','function save(','function load(','function updatePolice(']) {
