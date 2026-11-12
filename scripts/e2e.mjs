@@ -40,7 +40,12 @@ try {
   await page.locator('#medkit').click();
   await page.locator('#buy-medkit').waitFor();
   await page.locator('#buy-medkit').click();
+  await page.locator('#save').click();
+  const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('gcr-save-v2')));
+  if (!persisted || !persisted.state || !Array.isArray(persisted.state.inventory)) throw new Error('Save data was not written');
   await page.locator('#continue').click();
+  await page.reload({waitUntil:'networkidle'});
+  await page.waitForFunction(() => document.querySelector('#world')?.width > 0);
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(700);
   await page.keyboard.up('ArrowRight');
