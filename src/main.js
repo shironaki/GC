@@ -139,6 +139,7 @@ function drawMinimap(){
  for(const d of DISTRICTS){mapCtx.fillStyle=state.unlocked.includes(d.id)?'#42594b':'#262d30';mapCtx.fillRect(d.bounds.x*sx,d.bounds.y*sy,d.bounds.w*sx,d.bounds.h*sy);mapCtx.strokeStyle='#a9b3a455';mapCtx.strokeRect(d.bounds.x*sx,d.bounds.y*sy,d.bounds.w*sx,d.bounds.h*sy)}
  mapCtx.fillStyle='#737b78';for(const r of world.roads)mapCtx.fillRect(r.x*sx,r.y*sy,Math.max(1,r.w*sx),Math.max(1,r.h*sy));
  for(const b of world.buildings){mapCtx.fillStyle=b.owned?'#e2b969':'#b6c0b4';mapCtx.fillRect(b.x*sx,b.y*sy,Math.max(2,b.w*sx),Math.max(2,b.h*sy))}
+ const mission=currentMission();if(mission){const target=world.buildings.find(b=>b.id===mission.target);if(target){mapCtx.strokeStyle='#ffe18a';mapCtx.lineWidth=1.5;mapCtx.beginPath();mapCtx.arc((target.x+target.w/2)*sx,(target.y+target.h/2)*sy,4,0,Math.PI*2);mapCtx.stroke()}else if(mission.target==='gang'){const enemy=world.gangs.find(g=>g.alive);if(enemy){mapCtx.strokeStyle='#ffe18a';mapCtx.lineWidth=1.5;mapCtx.beginPath();mapCtx.arc(enemy.x*sx,enemy.y*sy,4,0,Math.PI*2);mapCtx.stroke()}}}
  for(const c of world.cars){mapCtx.fillStyle='#7e9aa4';mapCtx.fillRect(c.x*sx-1,c.y*sy-1,2,2)}
  for(const g of world.gangs)if(g.alive){mapCtx.fillStyle='#d56c55';mapCtx.fillRect(g.x*sx-1,g.y*sy-1,3,3)}
  for(const mate of world.crew){mapCtx.fillStyle='#8dbb79';mapCtx.fillRect(mate.x*sx-1,mate.y*sy-1,3,3)}
