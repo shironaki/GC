@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#111820">
+<meta name="description" content="Gangstar City: Revival — мобильная криминальная песочница в духе оригинальной Gangstar City.">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Gangstar City: Revival</title>
+<style>
+:root{color-scheme:dark;--gold:#e5b65b;--panel:rgba(12,18,24,.92);--line:rgba(229,182,91,.3)}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10171b;color:#f1eee6;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none}canvas{display:block;width:100%;height:100%;background:#25312d}
+#game{position:fixed;inset:0;overflow:hidden}#hud{position:absolute;inset:0;pointer-events:none;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom)}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.brand,.stats,.mission,.panel,.toast{background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 28px #0008;backdrop-filter:blur(8px)}
+.brand{padding:8px 12px;border-radius:12px}.brand b{display:block;letter-spacing:1px;color:var(--gold);font-size:12px}.brand small{color:#aeb9b3;font-size:10px}
+.stats{padding:7px 10px;border-radius:12px;font-size:12px;line-height:1.55;text-align:right}.stats strong{color:var(--gold)}
+.mission{position:absolute;top:86px;left:12px;max-width:min(270px,65vw);padding:9px 11px;border-radius:11px;font-size:11px}.mission b{color:var(--gold);display:block;margin-bottom:3px}
+#controls{position:absolute;inset:0;pointer-events:none}.stick{position:absolute;left:22px;bottom:calc(26px + env(safe-area-inset-bottom));width:128px;height:128px;border-radius:50%;background:#dbe7df18;border:1px solid #ffffff35;pointer-events:auto;touch-action:none}.nub{position:absolute;width:54px;height:54px;left:36px;top:36px;border-radius:50%;background:#d9e1d6a8;border:2px solid #fff9;box-shadow:0 3px 12px #0008}
+.actions{position:absolute;right:16px;bottom:calc(24px + env(safe-area-inset-bottom));display:grid;grid-template-columns:64px 64px;gap:9px;pointer-events:auto}.act{border:1px solid #f0c87588;background:#18232be8;color:#fff;border-radius:50%;width:64px;height:64px;font-weight:700;font-size:11px;box-shadow:0 4px 16px #0008}.act.primary{background:#8b5228ed}.act:active{transform:scale(.95)}
+#menuBtn{position:absolute;right:12px;top:calc(76px + env(safe-area-inset-top));pointer-events:auto;border:1px solid var(--line);background:var(--panel);color:#f5dfac;border-radius:10px;padding:8px 12px}
+#overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#05090dcc;padding:18px;pointer-events:auto}
+.panel{width:min(520px,100%);max-height:85%;overflow:auto;border-radius:16px;padding:18px}.panel h2{margin:0 0 8px;color:var(--gold);font-size:20px}.panel p{color:#c5cec8;font-size:13px;line-height:1.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.choice{background:#1a252c;border:1px solid #ffffff20;color:#f4f0e7;border-radius:10px;padding:11px;text-align:left}.choice b{display:block;color:#e9bf70;margin-bottom:3px}.choice small{color:#aab5ae}.bar{height:7px;background:#ffffff1c;border-radius:8px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:#b96d42}
+#toast{position:absolute;left:50%;bottom:190px;transform:translateX(-50%);padding:9px 14px;border-radius:10px;font-size:12px;display:none;white-space:nowrap;pointer-events:none}
+@media(min-width:800px){.stick{width:145px;height:145px}.nub{left:43px;top:43px}.actions{grid-template-columns:72px 72px}.act{width:72px;height:72px}}
+</style>
+</head>
+<body>
+<div id="game"><canvas id="c"></canvas><div id="hud">
+ <div class="top"><div class="brand"><b>GANGSTAR CITY</b><small>REVIVAL · BUILD 0.1</small></div><div class="stats" id="stats">💵 <strong>$0</strong><br>❤️ 100 &nbsp; ⭐ 0</div></div>
+ <div class="mission" id="mission"><b>ПЕРВОЕ ДЕЛО</b><span>Подойди к отмеченному месту и нажми «Действие».</span></div>
+ <button id="menuBtn">☰ ГОРОД</button>
+ <div id="controls"><div class="stick" id="stick"><div class="nub" id="nub"></div></div><div class="actions"><button class="act" id="act">ДЕЙСТВИЕ</button><button class="act primary" id="fight">УДАР</button></div></div>
+ <div id="toast" class="toast"></div>
+</div>
+<div id="overlay"><div class="panel" id="panel"></div></div>
+</div>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let W=0,H=0,dpr=1,last=0,toastTimer=0,saveTimer=0;
+const state={money:450,health:100,rep:0,day:1,ammo:12,medkits:2,selected:'',mission:0,owned:[],crew:0,car:false,carHp:100,heat:0,kills:0,buildings:0};
+const player={x:0,y:0,dx:0,dy:0,speed:2.25,angle:0,attack:0,inv:0};
+const camera={x:0,y:0};
+const keys={};let joy={x:0,y:0,active:false,id:null};
+const world={w:2200,h:1700,roads:[],buildings:[],cars:[],people:[],gangs:[],props:[]};
+const missions=[
+ {title:'ПЕРВОЕ ДЕЛО',desc:'Подойди к автомастерской и нажми «Действие».',target:'garage'},
+ {title:'ДОЛГИ НЕ ЖДУТ',desc:'Забери посылку у восточного склада.',target:'warehouse'},
+ {title:'УЛИЧНЫЙ АВТОРИТЕТ',desc:'Разберись с бандитом возле переулка.',target:'gang'},
+ {title:'СВОЙ БИЗНЕС',desc:'Купи продуктовый магазин за $300.',target:'shop'},
+ {title:'НОВЫЙ КВАРТАЛ',desc:'Заработай 5 очков репутации и открой Downtown.',target:'rep'}
+];
+const iso=(x,y)=>({x:(x-y)*.72,y:(x+y)*.38});
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',resize);resize();
+function rnd(a,b){return a+Math.random()*(b-a)}
+function initWorld(){
+ world.roads=[];world.buildings=[];world.cars=[];world.people=[];world.gangs=[];world.props=[];
+ for(let y=130;y<world.h;y+=310){world.roads.push({x:0,y,w:world.w,h:100,vertical:false})}
+ for(let x=130;x<world.w;x+=390){world.roads.push({x,y:0,w:100,h:world.h,vertical:true})}
+ const specs=[
+ ['garage','АВТОМАСТЕРСКАЯ',350,270,170,130,'#6a5945',0],
+ ['warehouse','ВОСТОЧНЫЙ СКЛАД',870,260,190,145,'#675b4a',0],
+ ['shop','ПРОДУКТОВЫЙ',1390,260,155,120,'#5d6651',300],
+ ['club','НОЧНОЙ КЛУБ',420,850,185,145,'#594c64',650],
+ ['safehouse','УБЕЖИЩЕ',1080,850,175,135,'#59616a',500],
+ ['bank','БАНК',1660,850,180,145,'#69645b',1200],
+ ['docks','ПОРТ',1450,1350,210,140,'#4e5e61',0]
+ ];
+ for(const [id,name,x,y,w,h,color,cost] of specs)world.buildings.push({id,name,x,y,w,h,color,cost,owned:false,level:1,income:id==='shop'?35:id==='club'?60:0});
+ for(let i=0;i<15;i++)world.cars.push({x:rnd(160,2050),y:rnd(160,1500),angle:Math.random()<.5?0:Math.PI/2,color:['#8a3931','#344e63','#9b8656','#58675c'][i%4],occupied:false});
+ for(let i=0;i<32;i++)world.people.push({x:rnd(100,2100),y:rnd(100,1600),phase:rnd(0,6),shirt:['#8e9b91','#b28b62','#7a8290','#9c6557'][i%4]});
+ for(let i=0;i<5;i++)world.gangs.push({x:760+i*90,y:690+(i%2)*55,hp:55,max:55,alive:true,phase:rnd(0,6)});
+}
+initWorld();player.x=220;player.y=220;
+function notify(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.display='none',2200)}
+function save(){try{localStorage.setItem('gcr-save',JSON.stringify({state,player:{x:player.x,y:player.y},buildings:world.buildings.map(b=>({id:b.id,owned:b.owned,level:b.level}))}))}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem('gcr-save')||'null');if(d){Object.assign(state,d.state||{});if(d.player){player.x=d.player.x;player.y=d.player.y}for(const b of world.buildings){const v=(d.buildings||[]).find(x=>x.id===b.id);if(v)Object.assign(b,v)}}}catch(e){}}
+load();
+function drawDiamond(x,y,w,h,fill,stroke){ctx.beginPath();ctx.moveTo(x,y-h/2);ctx.lineTo(x+w/2,y);ctx.lineTo(x,y+h/2);ctx.lineTo(x-w/2,y);ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.stroke()}}
+function worldToScreen(x,y){const p=iso(x-camera.x,y-camera.y);return{x:W/2+p.x,y:H/2+p.y}}
+function drawGround(){
+ ctx.fillStyle='#283b35';ctx.fillRect(0,0,W,H);
+ // subtle block grid
+ for(let x=-world.h;x<world.w+world.h;x+=110){let a=worldToScreen(x,0),b=worldToScreen(x,world.h);ctx.strokeStyle='#ffffff08';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+ for(const r of world.roads){const a=worldToScreen(r.x,r.y),p=iso(r.w,r.h);ctx.save();ctx.translate(a.x,a.y);ctx.fillStyle='#343a3c';ctx.fillRect(-p.x,-p.y,p.x*2,p.y*2);ctx.restore()}
+ // road markings
+ for(let y=180;y<world.h;y+=310){for(let x=40;x<world.w;x+=105){const p=worldToScreen(x,y+48);ctx.fillStyle='#c9b78b55';ctx.fillRect(p.x-10,p.y-1,20,2)}}
+ for(let x=180;x<world.w;x+=390){for(let y=40;y<world.h;y+=105){const p=worldToScreen(x+48,y);ctx.fillStyle='#c9b78b55';ctx.fillRect(p.x-1,p.y-10,2,20)}}
+}
+function drawBuilding(b){
+ const p=worldToScreen(b.x+b.w/2,b.y+b.h/2),w=(b.w+b.h)*.36,h=(b.w+b.h)*.19,wall=60;
+ drawDiamond(p.x,p.y+wall,w,h,b.owned?'#655a43':'#414d49','#111a18');
+ ctx.fillStyle=b.color;ctx.beginPath();ctx.moveTo(p.x-w/2,p.y);ctx.lineTo(p.x,p.y-h/2);ctx.lineTo(p.x,p.y-h/2-wall);ctx.lineTo(p.x-w/2,p.y-wall);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#0005';ctx.beginPath();ctx.moveTo(p.x+w/2,p.y);ctx.lineTo(p.x,p.y-h/2);ctx.lineTo(p.x,p.y-h/2-wall);ctx.lineTo(p.x+w/2,p.y-wall);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#b6a27a';ctx.beginPath();ctx.moveTo(p.x-w/2,p.y-wall);ctx.lineTo(p.x,p.y-h/2-wall-18);ctx.lineTo(p.x+w/2,p.y-wall);ctx.lineTo(p.x,p.y-h/2-18);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#f1d69b';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText(b.name,p.x,p.y+wall+18);
+ if(missions[state.mission]&&missions[state.mission].target===b.id){ctx.fillStyle='#eabf61';ctx.beginPath();ctx.arc(p.x,p.y-wall-32,7,0,Math.PI*2);ctx.fill()}
+}
+function drawCar(c){const p=worldToScreen(c.x,c.y);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(c.angle);ctx.fillStyle='#0006';ctx.fillRect(-19,2,40,17);ctx.fillStyle=c.color;ctx.fillRect(-18,-10,36,18);ctx.fillStyle='#aabdc0';ctx.fillRect(-10,-8,19,7);ctx.fillStyle='#171b1d';ctx.fillRect(-14,7,8,5);ctx.fillRect(8,7,8,5);ctx.restore()}
+function drawPerson(p,isGang=false){const s=worldToScreen(p.x,p.y);ctx.fillStyle='#0006';ctx.beginPath();ctx.ellipse(s.x,s.y+5,8,4,0,0,7);ctx.fill();ctx.fillStyle=isGang?'#a04b3f':p.shirt;ctx.beginPath();ctx.arc(s.x,s.y-4,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d0a17c';ctx.beginPath();ctx.arc(s.x,s.y-14,4,0,Math.PI*2);ctx.fill();if(isGang){ctx.fillStyle='#f2c46c';ctx.fillRect(s.x-9,s.y-25,18,3);ctx.fillStyle='#fff';ctx.font='9px system-ui';ctx.textAlign='center';ctx.fillText(Math.ceil(p.hp),s.x,s.y-29)}}
+function drawPlayer(){const p=worldToScreen(player.x,player.y);ctx.fillStyle='#0008';ctx.beginPath();ctx.ellipse(p.x,p.y+7,11,5,0,0,7);ctx.fill();ctx.fillStyle=state.car?'#9b6b40':'#d3d5ca';ctx.fillRect(p.x-7,p.y-12,14,19);ctx.fillStyle='#b98765';ctx.beginPath();ctx.arc(p.x,p.y-17,6,0,7);ctx.fill();ctx.strokeStyle='#292a27';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(p.x-5,p.y+4);ctx.lineTo(p.x-7,p.y+12);ctx.moveTo(p.x+5,p.y+4);ctx.lineTo(p.x+7,p.y+12);ctx.stroke();if(player.attack>0){ctx.strokeStyle='#e8c078';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y-4,25,-.9,.9);ctx.stroke()}}
+function render(){
+ ctx.clearRect(0,0,W,H);drawGround();
+ const entities=[];for(const b of world.buildings)entities.push({y:b.y+b.h,fn:()=>drawBuilding(b)});
+ for(const c of world.cars)entities.push({y:c.y,fn:()=>drawCar(c)});
+ for(const p of world.people)entities.push({y:p.y,fn:()=>drawPerson(p)});
+ for(const g of world.gangs)if(g.alive)entities.push({y:g.y,fn:()=>drawPerson(g,true)});
+ entities.push({y:player.y,fn:drawPlayer});entities.sort((a,b)=>a.y-b.y);for(const e of entities)e.fn();
+ const m=missions[state.mission];if(m){let t=world.buildings.find(b=>b.id===m.target);if(t&&m.target!=='rep'&&m.target!=='gang'){const p=worldToScreen(t.x+t.w/2,t.y+t.h/2);ctx.strokeStyle='#e9bb61';ctx.setLineDash([4,5]);ctx.beginPath();ctx.arc(p.x,p.y,35+Math.sin(performance.now()/250)*5,0,7);ctx.stroke();ctx.setLineDash([])}}
+ updateHud();
+}
+function updateHud(){$('stats').innerHTML='💵 <strong>$'+Math.floor(state.money)+'</strong><br>❤️ '+Math.ceil(state.health)+' &nbsp; ⭐ '+state.rep+'<br>🔫 '+state.ammo+' &nbsp; 👥 '+state.crew;$('mission').innerHTML='<b>'+missions[state.mission].title+'</b><span>'+missions[state.mission].desc+'</span>'}
+function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function nearest(){let all=world.buildings.map(b=>({obj:b,d:distance(player,b),type:'building'})).concat(world.gangs.filter(g=>g.alive).map(g=>({obj:g,d:distance(player,g),type:'gang'})),world.cars.map(c=>({obj:c,d:distance(player,c),type:'car'})));return all.filter(x=>x.d<100).sort((a,b)=>a.d-b.d)[0]}
+function complete(){state.mission=Math.min(state.mission+1,missions.length-1);state.rep+=1;state.money+=180;notify('Задание выполнено · +$180 · +1 репутация');if(state.mission===4)notify('Открыта новая цель: Downtown');save()}
+function interact(){
+ const n=nearest();if(!n){notify('Подойди ближе к объекту');return}
+ if(n.type==='car'){if(!state.car){state.car=true;n.obj.occupied=true;player.x=n.obj.x;player.y=n.obj.y;notify('Ты за рулём. Используй джойстик для езды')}else{state.car=false;n.obj.occupied=false;notify('Ты вышел из машины')}return}
+ const b=n.obj;
+ if(b.id==='garage'){if(state.mission===0){complete();return}openBuilding(b);return}
+ if(b.id==='warehouse'){if(state.mission===1){state.money+=250;complete();return}openBuilding(b);return}
+ if(n.type==='gang'){hitGang(n.obj,35);return}
+ openBuilding(b);
+}
+function hitGang(g,damage){if(!g||!g.alive)return;g.hp-=damage;player.attack=.2;state.heat=Math.min(5,state.heat+1);if(g.hp<=0){g.alive=false;state.kills++;state.money+=75;state.rep++;state.ammo+=2;notify('Противник повержен · +$75');if(state.mission===2)complete()}else notify('Попадание!');save()}
+function attack(){if(state.car){notify('Выйди из машины');return}const g=world.gangs.filter(g=>g.alive&&distance(player,g)<95).sort((a,b)=>distance(player,a)-distance(player,b))[0];if(g){hitGang(g,28);return}if(state.ammo>0){state.ammo--;state.heat=Math.min(5,state.heat+1);notify('Выстрел в воздух. Противников рядом нет')}else notify('Нет патронов')}
+function openBuilding(b){
+ const overlay=$('overlay'),panel=$('panel');overlay.style.display='flex';
+ let owned=b.owned;
+ panel.innerHTML='<h2>'+b.name+'</h2><p>'+(owned?'Объект под твоим контролем. Уровень '+b.level+'.':'Можно приобрести этот объект и получать доход.')+'</p>'+
+ (b.cost?'<p>Цена: <b style="color:#e9bf70">$'+b.cost+'</b></p>':'')+
+ (b.income?'<p>Доход: $'+(b.income*b.level)+' / игровой день</p>':'')+
+ '<div class="grid">'+
+ (b.cost&&!owned?'<button class="choice" id="buy"><b>Купить</b><small>Приобрести бизнес</small></button>':'')+
+ (owned?'<button class="choice" id="upgrade"><b>Улучшить · $'+(250*b.level)+'</b><small>Увеличить доход</small></button>':'')+
+ (b.id==='garage'?'<button class="choice" id="repair"><b>Починить машину · $100</b><small>Восстановить транспорт</small></button>':'')+
+ '<button class="choice" id="close"><b>Закрыть</b><small>Вернуться в город</small></button></div>';
+ const close=()=>overlay.style.display='none';$('close').onclick=close;
+ if($('buy'))$('buy').onclick=()=>{if(state.money<b.cost){notify('Не хватает денег');return}state.money-=b.cost;b.owned=true;state.buildings++;notify('Бизнес приобретён!');if(state.mission===3&&b.id==='shop')complete();save();openBuilding(b)};
+ if($('upgrade'))$('upgrade').onclick=()=>{let cost=250*b.level;if(state.money<cost){notify('Не хватает денег');return}state.money-=cost;b.level++;notify('Уровень бизнеса повышен');save();openBuilding(b)};
+ if($('repair'))$('repair').onclick=()=>{if(state.money<100){notify('Не хватает денег');return}state.money-=100;state.carHp=100;notify('Машина отремонтирована');save()};
+}
+function openMenu(){const overlay=$('overlay'),panel=$('panel');overlay.style.display='flex';panel.innerHTML='<h2>ГОРОД · ПАУЗА</h2><p>East Side · День '+state.day+' · Репутация '+state.rep+'</p><div class="grid">'+
+ '<button class="choice" id="business"><b>Мои бизнесы</b><small>'+state.buildings+' объектов</small></button>'+
+ '<button class="choice" id="crew"><b>Нанять бойца · $200</b><small>Поддержка в уличных разборках</small></button>'+
+ '<button class="choice" id="med"><b>Аптечка · $80</b><small>Восстановить 45 здоровья</small></button>'+
+ '<button class="choice" id="day"><b>Следующий день</b><small>Собрать доход с бизнесов</small></button>'+
+ '<button class="choice" id="save"><b>Сохранить игру</b><small>Локальное сохранение</small></button>'+
+ '<button class="choice" id="close"><b>Продолжить</b><small>Вернуться в город</small></button></div><p>Управление: левый джойстик — движение/руль; «Действие» — взаимодействие; «Удар» — атака.</p>';
+ $('close').onclick=()=>overlay.style.display='none';
+ $('business').onclick=()=>{let owned=world.buildings.filter(b=>b.owned);panel.innerHTML='<h2>МОИ БИЗНЕСЫ</h2><p>'+ (owned.length?owned.map(b=>b.name+' · ур. '+b.level).join('<br>'):'Пока нет собственности.')+'</p><button class="choice" id="back"><b>Назад</b></button>'; $('back').onclick=openMenu};
+ $('crew').onclick=()=>{if(state.money<200){notify('Не хватает денег');return}state.money-=200;state.crew++;notify('Боец нанят. Команда: '+state.crew);save();openMenu()};
+ $('med').onclick=()=>{if(state.money<80){notify('Не хватает денег');return}state.money-=80;state.health=Math.min(100,state.health+45);notify('Здоровье восстановлено');save();openMenu()};
+ $('day').onclick=()=>{let income=0;for(const b of world.buildings)if(b.owned)income+=b.income*b.level;state.money+=income;state.day++;state.health=Math.min(100,state.health+8);notify('Новый день · доход $'+income);save();openMenu()};
+ $('save').onclick=()=>{save();notify('Игра сохранена');};
+}
+$('menuBtn').onclick=openMenu;$('act').onclick=interact;$('fight').onclick=attack;
+function setJoy(x,y){joy.x=x;joy.y=y;const max=38;const len=Math.hypot(x,y)||1;const k=Math.min(1,max/len);$('nub').style.transform='translate('+(x*k)+'px,'+(y*k)+'px)'}
+const stick=$('stick');stick.addEventListener('pointerdown',e=>{joy.active=true;joy.id=e.pointerId;stick.setPointerCapture(e.pointerId);const r=stick.getBoundingClientRect();setJoy(e.clientX-(r.left+r.width/2),e.clientY-(r.top+r.height/2))});
+stick.addEventListener('pointermove',e=>{if(joy.active&&e.pointerId===joy.id){const r=stick.getBoundingClientRect();setJoy(e.clientX-(r.left+r.width/2),e.clientY-(r.top+r.height/2))}});
+function endJoy(e){if(joy.active&&e.pointerId===joy.id){joy.active=false;joy.id=null;setJoy(0,0)}}stick.addEventListener('pointerup',endJoy);stick.addEventListener('pointercancel',endJoy);
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key===' '){e.preventDefault();attack()}if(e.key.toLowerCase()==='e')interact();if(e.key==='Escape')$('overlay').style.display='none'});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function update(dt){
+ let x=joy.x/38,y=joy.y/38;if(keys.w||keys.arrowup)y=-1;if(keys.s||keys.arrowdown)y=1;if(keys.a||keys.arrowleft)x=-1;if(keys.d||keys.arrowright)x=1;
+ const len=Math.hypot(x,y);if(len>1){x/=len;y/=len}
+ const speed=state.car?4.2:player.speed;player.dx=x*speed;player.dy=y*speed;
+ player.x=Math.max(30,Math.min(world.w-30,player.x+player.dx*dt*60));player.y=Math.max(30,Math.min(world.h-30,player.y+player.dy*dt*60));
+ if(len>.1)player.angle=Math.atan2(y,x);
+ if(state.car){let c=world.cars.find(c=>c.occupied);if(c){c.x=player.x;c.y=player.y;c.angle=player.angle}}
+ player.attack=Math.max(0,player.attack-dt);player.inv=Math.max(0,player.inv-dt);
+ for(const p of world.people){p.phase+=dt;p.x+=Math.sin(p.phase)*.08;p.y+=Math.cos(p.phase*.7)*.06}
+ for(const g of world.gangs){if(!g.alive)continue;g.phase+=dt;let d=distance(player,g);if(d<230&&!state.car){let a=Math.atan2(player.y-g.y,player.x-g.x);g.x+=Math.cos(a)*.55;g.y+=Math.sin(a)*.55;if(d<24&&player.inv<=0){state.health-=7;player.inv=.9;if(state.health<=0){state.health=35;state.money=Math.max(0,state.money-100);player.x=220;player.y=220;notify('Тебя вырубили. Потеряно $100')}}}}
+ camera.x+=(player.x-camera.x)*Math.min(1,dt*5);camera.y+=(player.y-camera.y)*Math.min(1,dt*5);
+ saveTimer+=dt;if(saveTimer>12){saveTimer=0;save()}
+}
+function loop(t){let dt=Math.min(.04,(t-last)/1000||0);last=t;if($('overlay').style.display!=='flex')update(dt);render();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+addEventListener('beforeunload',save);
+})();
+</script>
+</body></html>
