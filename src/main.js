@@ -55,7 +55,9 @@ function makeWorld(){
    const seed=Math.abs(Math.sin(bx*12.9898+by*78.233)*43758.5453)%1;
    for(let n=0;n<2+(seed>.55?1:0);n++){
      const t=(seed+n*.371)%1,u=(seed*.73+n*.219)%1;
-     world.cityProps.push({x:bx+28+t*190,y:by+20+u*145,w:62+t*58,d:58+u*52,h:78+((seed+n*.17)%1)*125,color:['#45484a','#55504b','#414b4d','#5a5149','#3c474b'][n%5],seed:seed+n*.31});
+     const prop={x:bx+28+t*190,y:by+20+u*145,w:62+t*58,d:58+u*52,h:78+((seed+n*.17)%1)*125,color:['#45484a','#55504b','#414b4d','#5a5149','#3c474b'][n%5],seed:seed+n*.31};
+     const overlapsLandmark=BUILDING_SEEDS.some(seed=>prop.x<seed[2]+seed[4]+24&&prop.x+prop.w>seed[2]-24&&prop.y<seed[3]+seed[5]+24&&prop.y+prop.d>seed[3]-24);
+     if(!overlapsLandmark)world.cityProps.push(prop);
    }
  }
  world.cars=[];
