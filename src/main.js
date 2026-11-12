@@ -1,5 +1,7 @@
 const canvas=document.querySelector('#world');
 const ctx=canvas.getContext('2d',{alpha:false});
+const minimap=document.querySelector('#minimap');
+const mapCtx=minimap.getContext('2d');
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -118,6 +120,18 @@ function drawHuman(entity,kind='civilian'){
  if(kind==='gang'){ctx.fillStyle='#f4d5a0';ctx.font='9px system-ui';ctx.textAlign='center';ctx.fillText(Math.ceil(entity.hp),p.x,p.y-29)}
  if(entity===player){ctx.strokeStyle='#252a28';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(p.x-4,p.y+4);ctx.lineTo(p.x-6,p.y+12);ctx.moveTo(p.x+4,p.y+4);ctx.lineTo(p.x+6,p.y+12);ctx.stroke();if(player.attack>0){ctx.strokeStyle='#e8c078';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y-4,25,-.9,.9);ctx.stroke()}}
 }
+function drawMinimap(){
+ const w=132,h=100,sx=w/WORLD.w,sy=h/WORLD.h;
+ mapCtx.setTransform(2,0,0,2,0,0);mapCtx.clearRect(0,0,w,h);
+ mapCtx.fillStyle='#172421';mapCtx.fillRect(0,0,w,h);
+ for(const d of DISTRICTS){mapCtx.fillStyle=state.unlocked.includes(d.id)?'#42594b':'#262d30';mapCtx.fillRect(d.bounds.x*sx,d.bounds.y*sy,d.bounds.w*sx,d.bounds.h*sy);mapCtx.strokeStyle='#a9b3a455';mapCtx.strokeRect(d.bounds.x*sx,d.bounds.y*sy,d.bounds.w*sx,d.bounds.h*sy)}
+ mapCtx.fillStyle='#737b78';for(const r of world.roads)mapCtx.fillRect(r.x*sx,r.y*sy,Math.max(1,r.w*sx),Math.max(1,r.h*sy));
+ for(const b of world.buildings){mapCtx.fillStyle=b.owned?'#e2b969':'#b6c0b4';mapCtx.fillRect(b.x*sx,b.y*sy,Math.max(2,b.w*sx),Math.max(2,b.h*sy))}
+ for(const c of world.cars){mapCtx.fillStyle='#7e9aa4';mapCtx.fillRect(c.x*sx-1,c.y*sy-1,2,2)}
+ for(const g of world.gangs)if(g.alive){mapCtx.fillStyle='#d56c55';mapCtx.fillRect(g.x*sx-1,g.y*sy-1,3,3)}
+ mapCtx.fillStyle='#f3d27f';mapCtx.beginPath();mapCtx.arc(player.x*sx,player.y*sy,3,0,Math.PI*2);mapCtx.fill();
+ mapCtx.strokeStyle='#f3d27f';mapCtx.lineWidth=1;mapCtx.strokeRect(Math.max(0,(camera.x-360)*sx),Math.max(0,(camera.y-360)*sy),Math.min(w,720*sx),Math.min(h,720*sy));
+}
 function render(){
  drawGround();
  const items=[];
@@ -221,7 +235,7 @@ function updatePolice(dt,car){
  for(let i=world.police.length-1;i>=0;i--){const cop=world.police[i],d=dist(player,cop),a=Math.atan2(player.y-cop.y,player.x-cop.x);cop.x+=Math.cos(a)*(car?1.3:.55);cop.y+=Math.sin(a)*(car?1.3:.55);cop.phase+=dt;if(d<24&&player.invulnerable<=0){state.health-=4;player.invulnerable=1;if(state.health<=0)knockOut()}if(state.wanted===0&&d>500)world.police.splice(i,1)}
 }
 function knockOut(){state.health=40;state.money=Math.max(0,state.money-120);state.wanted=0;if(player.inCar)exitCar();player.x=190;player.y=200;world.police=[];notify('Тебя вырубили. Потеряно $120');save()}
-function frame(time){const dt=Math.min(.04,(time-lastTime)/1000||0);lastTime=time;if(!gamePaused)update(dt);render();hudClock+=dt;if(hudClock>=.2){hudClock=0;updateHud()}requestAnimationFrame(frame)}
+function frame(time){const dt=Math.min(.04,(time-lastTime)/1000||0);lastTime=time;if(!gamePaused)update(dt);render();hudClock+=dt;if(hudClock>=.2){hudClock=0;updateHud();drawMinimap()}requestAnimationFrame(frame)}
 function setupJoystick(){
  const pad=$('joystick'),knob=$('joystick-knob');
  const set=(x,y)=>{const max=39,len=Math.hypot(x,y)||1,k=Math.min(1,max/len);joystick.x=x*k/max;joystick.y=y*k/max;knob.style.transform='translate('+x*k+'px,'+y*k+'px)'};
