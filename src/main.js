@@ -35,11 +35,12 @@ const state={
  wanted:0,crew:0,kills:0,mission:0,carRepairs:0,owned:[],unlocked:['east'],
  inventory:['Пистолет','Телефон','Ключи'],equipped:'Пистолет'
 };
-const player={x:190,y:200,vx:0,vy:0,angle:0,walk:0,attack:0,invulnerable:0,inCar:null};
+const player={x:190,y:200,vx:0,vy:0,angle:0,walk:0,attack:0,attackCooldown:0,invulnerable:0,inCar:null};
 const camera={x:player.x,y:player.y};
 const world={buildings:[],cars:[],civilians:[],gangs:[],police:[],decor:[],roads:[]};
 let width=0,height=0,scale=1,lastTime=0,saveClock=0,toastClock=0,gamePaused=false;
 let joystick={active:false,pointer:null,x:0,y:0};
+let sprintHeld=false;
 const keys=new Set();
 
 function makeWorld(){
@@ -130,7 +131,119 @@ function render(){
 function currentMission(){return MISSIONS[state.mission]||null}
 function notify(message){const el=$('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toastClock);toastClock=setTimeout(()=>el.classList.remove('visible'),2300)}
 function updateHud(){
- $('resources').innerHTML='💵 <b>$'+Math.floor(state.money)+'</b><br>❤️ '+Math.ceil(state.health)+' &nbsp; ⭐ '+state.rep+'<br>🔫 '+state.ammo+' &nbsp; ☠ '+state.wanted;
+ $('resources').innerHTML='💵 <b>
+ const m=currentMission();$('mission-card').innerHTML=m?'<strong>'+m.title+'</strong>'+m.text:'<strong>СВОБОДНАЯ ИГРА</strong>Город открыт. Зарабатывай, развивай бизнес и исследуй районы.';
+ const d=DISTRICTS.find(v=>state.unlocked.includes(v.id)&&player.x>=v.bounds.x&&player.x<v.bounds.x+v.bounds.w&&player.y>=v.bounds.y&&player.y<v.bounds.y+v.bounds.h)||DISTRICTS[0];$('district-tag').textContent=d.name;
+}
+function currentDistrict(){return DISTRICTS.find(d=>player.x>=d.bounds.x&&player.x<d.bounds.x+d.bounds.w&&player.y>=d.bounds.y&&player.y<d.bounds.y+d.bounds.h)||DISTRICTS[0]}
+function unlockedAt(x,y){const d=DISTRICTS.find(v=>x>=v.bounds.x&&x<v.bounds.x+v.bounds.w&&y>=v.bounds.y&&y<v.bounds.y+v.bounds.h);return !d||state.unlocked.includes(d.id)}
+function collides(x,y){for(const b of world.buildings){if(x>b.x-12&&x<b.x+b.w+12&&y>b.y-12&&y<b.y+b.h+12)return true}return false}
+function nearestTarget(max=105){const candidates=[];for(const b of world.buildings)candidates.push({type:'building',object:b,d:dist(player,{x:b.x+b.w/2,y:b.y+b.h/2})});for(const c of world.cars)candidates.push({type:'car',object:c,d:dist(player,c)});for(const g of world.gangs)if(g.alive)candidates.push({type:'gang',object:g,d:dist(player,g)});return candidates.filter(v=>v.d<max).sort((a,b)=>a.d-b.d)[0]||null}
+function finishMission(){const m=currentMission();state.money+=m.reward;state.rep++;state.mission=Math.min(state.mission+1,MISSIONS.length);if(state.rep>=4&&!state.unlocked.includes('downtown')){state.unlocked.push('downtown');notify('Downtown открыт! +$'+m.reward)}else notify('Задание выполнено · +$'+m.reward);if(state.mission===4&&state.rep>=4){state.money+=MISSIONS[4].reward;state.rep++;state.mission=5;notify('Downtown открыт · задание репутации выполнено')}if(state.rep>=6&&!state.unlocked.includes('harbor')){state.unlocked.push('harbor');notify('Harbor открыт!')}save();updateHud()}
+function interact(){
+ const target=nearestTarget();if(!target){notify('Подойди ближе к объекту');return}
+ if(target.type==='car'){if(!player.inCar){player.inCar=target.object.id;target.object.occupied=true;player.x=target.object.x;player.y=target.object.y;notify('Ты за рулём')}else exitCar();return}
+ if(target.type==='gang'){melee(target.object);return}
+ const b=target.object;
+ if(b.id==='garage'&&state.mission===0){finishMission();return}
+ if(b.id==='warehouse'&&state.mission===1){finishMission();return}
+ if(b.id==='safehouse'&&state.mission===5){finishMission();return}
+ if(b.id==='docks'&&state.mission===6){finishMission();return}
+ openBusiness(b);
+}
+function exitCar(){const car=world.cars.find(v=>v.id===player.inCar);if(!car)return;player.inCar=null;car.occupied=false;player.x=clamp(car.x+28,20,WORLD.w-20);player.y=car.y+18;notify('Ты вышел из машины')}
+function melee(g){if(dist(player,g)>100||player.attackCooldown>0)return;g.hp-=34;player.attack=.24;player.attackCooldown=.42;state.wanted=Math.min(5,state.wanted+1);if(g.hp<=0){g.alive=false;state.kills++;state.money+=75;state.ammo+=2;notify('Противник повержен · +$75');if(state.mission===2)finishMission();else state.rep++;}else notify('Удар попал');save()}
+function attack(){
+ if(player.inCar){notify('Выйди из машины, чтобы атаковать');return}
+ if(player.attackCooldown>0)return;
+ const gang=world.gangs.filter(g=>g.alive&&dist(player,g)<115).sort((a,b)=>dist(player,a)-dist(player,b))[0];
+ if(gang){melee(gang);return}
+ if(state.equipped==='Пистолет'&&state.ammo>0){state.ammo--;player.attackCooldown=.36;state.wanted=Math.min(5,state.wanted+1);const target=world.gangs.filter(g=>g.alive&&dist(player,g)<320).sort((a,b)=>dist(player,a)-dist(player,b))[0];if(target){target.hp-=48;if(target.hp<=0){target.alive=false;state.kills++;state.money+=75;if(state.mission===2)finishMission();else state.rep++}notify('Выстрел произведён')}else notify('Выстрел в воздух');save()}else notify('Нет патронов или оружие не экипировано')
+}
+function openModal(content){$('modal-content').innerHTML=content;$('modal').hidden=false;gamePaused=true}
+function closeModal(){$('modal').hidden=true;gamePaused=false}
+$('modal-close').addEventListener('click',closeModal);
+$('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal()});
+function openBusiness(b){
+ const owned=b.owned,cost=b.cost,upgrade=250*b.level;
+ openModal('<h2>'+b.name+'</h2><p>'+(owned?'Ты владеешь этим объектом. Уровень '+b.level+'.':'Приобрети объект, чтобы открыть источник дохода.')+'</p>'+(b.income?'<p>Доход: <b>$'+(b.income*b.level)+'</b> за игровой день.</p>':'')+
+ '<div class="choice-grid">'+(!owned&&cost?'<button class="choice" id="buy"><strong>Купить · $'+cost+'</strong><small>Оформить собственность</small></button>':'')+(owned?'<button class="choice" id="upgrade"><strong>Улучшить · $'+upgrade+'</strong><small>Повысить уровень и доход</small></button>':'')+
+ (b.id==='garage'?'<button class="choice" id="repair"><strong>Ремонт · $100</strong><small>Восстановить ближайшую машину</small></button>':'')+'<button class="choice" id="back"><strong>Закрыть</strong><small>Вернуться на улицу</small></button></div>');
+ $('back').onclick=closeModal;
+ if($('buy'))$('buy').onclick=()=>{if(state.money<cost){notify('Недостаточно денег');return}state.money-=cost;b.owned=true;state.owned.push(b.id);if(state.mission===3&&b.id==='shop')finishMission();save();notify('Бизнес приобретён');openBusiness(b)};
+ if($('upgrade'))$('upgrade').onclick=()=>{if(state.money<upgrade){notify('Недостаточно денег');return}state.money-=upgrade;b.level++;save();notify('Уровень повышен');openBusiness(b)};
+ if($('repair'))$('repair').onclick=()=>{if(state.money<100){notify('Недостаточно денег');return}const car=world.cars.find(c=>dist(player,c)<180);if(!car){notify('Рядом нет машины');return}state.money-=100;car.hp=100;save();notify('Машина отремонтирована')};
+}
+function openMenu(){
+ const owned=world.buildings.filter(b=>b.owned),income=owned.reduce((n,b)=>n+b.income*b.level,0);
+ openModal('<h2>ГОРОД · ПАУЗА</h2><p>День '+state.day+' · '+currentDistrict().name+' · Репутация '+state.rep+' · Убийства '+state.kills+'</p><div class="section-label">ПРОГРЕСС</div><div class="meter"><i style="width:'+Math.min(100,state.rep/8*100)+'%"></i></div><p>Розыск: '+state.wanted+'/5 · Команда: '+state.crew+' · Бизнесов: '+owned.length+'</p><div class="choice-grid">'+
+ '<button class="choice" id="businesses"><strong>Мои бизнесы</strong><small>'+owned.length+' объектов · $'+income+' за день</small></button>'+
+ '<button class="choice" id="crew"><strong>Нанять бойца · $200</strong><small>Пополнить уличную команду</small></button>'+
+ '<button class="choice" id="medkit"><strong>Использовать аптечку</strong><small>В запасе: '+state.medkits+' · восстановить до 45 здоровья</small></button>'+
+ '<button class="choice" id="buy-medkit"><strong>Купить аптечку · $80</strong><small>Добавить одну в запас</small></button>'+
+ '<button class="choice" id="day"><strong>Следующий день</strong><small>Получить доход и восстановиться</small></button>'+
+ '<button class="choice" id="inventory"><strong>Инвентарь</strong><small>'+state.inventory.join(', ')+'</small></button>'+
+ '<button class="choice" id="save"><strong>Сохранить игру</strong><small>Сохранение на этом устройстве</small></button>'+
+ '<button class="choice" id="continue"><strong>Продолжить</strong><small>Вернуться в город</small></button>'+
+ '<button class="choice" id="reset"><strong>Сбросить прогресс</strong><small>Начать новую игру</small></button></div>');
+ $('continue').onclick=closeModal;$('save').onclick=()=>{save();notify('Игра сохранена')};
+ $('crew').onclick=()=>{if(state.money<200){notify('Недостаточно денег');return}state.money-=200;state.crew++;state.inventory.push('Наёмник');save();notify('Боец нанят');openMenu()};
+ $('medkit').onclick=()=>{if(state.medkits<1){notify('В запасе нет аптечек');return}if(state.health>=100){notify('Здоровье уже полное');return}state.medkits--;state.health=Math.min(100,state.health+45);save();notify('Аптечка использована');openMenu()};
+ $('buy-medkit').onclick=()=>{if(state.money<80){notify('Недостаточно денег');return}state.money-=80;state.medkits++;save();notify('Аптечка куплена');openMenu()};
+ $('day').onclick=()=>{const amount=world.buildings.filter(b=>b.owned).reduce((n,b)=>n+b.income*b.level,0);state.money+=amount;state.day++;state.health=Math.min(100,state.health+10);state.stamina=100;state.wanted=Math.max(0,state.wanted-1);save();notify('Новый день · доход $'+amount);openMenu()};
+ $('businesses').onclick=()=>{const rows=owned.length?owned.map(b=>'<p>'+b.name+' · уровень '+b.level+' · $'+(b.income*b.level)+'/день</p>').join(''):'<p>Пока нет недвижимости.</p>';openModal('<h2>МОЯ НЕДВИЖИМОСТЬ</h2>'+rows+'<button class="choice" id="back"><strong>Назад</strong></button>');$('back').onclick=openMenu};
+ $('inventory').onclick=()=>{openModal('<h2>ИНВЕНТАРЬ</h2><p>'+state.inventory.map(item=>'• '+item).join('<br>')+'</p><p>Экипировано: '+state.equipped+'</p><button class="choice" id="pistol"><strong>Экипировать пистолет</strong><small>Патроны: '+state.ammo+'</small></button><button class="choice" id="back"><strong>Назад</strong></button>');$('pistol').onclick=()=>{state.equipped='Пистолет';notify('Пистолет экипирован');openMenu()};$('back').onclick=openMenu};
+ $('reset').onclick=()=>{if(!confirm('Удалить локальное сохранение и начать заново?'))return;localStorage.removeItem(SAVE_KEY);location.reload()};
+}
+$('menu-open').addEventListener('click',openMenu);
+
+function update(dt){
+ let ix=joystick.x,iy=joystick.y;if(keys.has('w')||keys.has('arrowup'))iy=-1;if(keys.has('s')||keys.has('arrowdown'))iy=1;if(keys.has('a')||keys.has('arrowleft'))ix=-1;if(keys.has('d')||keys.has('arrowright'))ix=1;
+ const length=Math.hypot(ix,iy);if(length>1){ix/=length;iy/=length}
+ const car=player.inCar?world.cars.find(c=>c.id===player.inCar):null;
+ const sprinting=!car&&sprintHeld&&length>.05&&state.stamina>1;
+ const speed=car?3.8:(sprinting?3.05:2.1);
+ const nx=player.x+ix*speed*dt*60,ny=player.y+iy*speed*dt*60;
+ if(length>.05){player.angle=Math.atan2(iy,ix);player.walk+=dt*(sprinting?15:10)}
+ if(sprinting)state.stamina=Math.max(0,state.stamina-dt*24);else state.stamina=Math.min(100,state.stamina+dt*13);
+ if(!collides(nx,player.y)&&unlockedAt(nx,player.y))player.x=clamp(nx,15,WORLD.w-15);
+ if(!collides(player.x,ny)&&unlockedAt(player.x,ny))player.y=clamp(ny,15,WORLD.h-15);
+ if(car){car.x=player.x;car.y=player.y;car.angle=player.angle;car.speed=length*speed}
+ player.attack=Math.max(0,player.attack-dt);player.attackCooldown=Math.max(0,player.attackCooldown-dt);player.invulnerable=Math.max(0,player.invulnerable-dt);
+ for(const civilian of world.civilians){civilian.phase+=dt;if(Math.sin(civilian.phase)>.98){civilian.x=clamp(civilian.x+Math.cos(civilian.phase)*civilian.speed*8,30,WORLD.w-30);civilian.y=clamp(civilian.y+Math.sin(civilian.phase)*civilian.speed*8,30,WORLD.h-30)}}
+ for(const g of world.gangs){if(!g.alive)continue;const d=dist(player,g);if(d<240&&!car){const a=Math.atan2(player.y-g.y,player.x-g.x);g.x+=Math.cos(a)*.7;g.y+=Math.sin(a)*.7;if(d<25&&player.invulnerable<=0){state.health-=6;player.invulnerable=.8;if(state.health<=0)knockOut()}}}
+ updatePolice(dt,car);
+ camera.x+=(player.x-camera.x)*Math.min(1,dt*5);camera.y+=(player.y-camera.y)*Math.min(1,dt*5);
+ saveClock+=dt;if(saveClock>18){saveClock=0;save()}
+}
+function updatePolice(dt,car){
+ if(state.wanted>0&&Math.random()<dt*.22&&world.police.length<state.wanted*2){world.police.push({x:clamp(player.x+rand(-380,380),20,WORLD.w-20),y:clamp(player.y+rand(-380,380),20,WORLD.h-20),hp:70,phase:0})}
+ for(let i=world.police.length-1;i>=0;i--){const cop=world.police[i],d=dist(player,cop),a=Math.atan2(player.y-cop.y,player.x-cop.x);cop.x+=Math.cos(a)*(car?1.3:.55);cop.y+=Math.sin(a)*(car?1.3:.55);cop.phase+=dt;if(d<24&&player.invulnerable<=0){state.health-=4;player.invulnerable=1;if(state.health<=0)knockOut()}if(state.wanted===0&&d>500)world.police.splice(i,1)}
+}
+function knockOut(){state.health=40;state.money=Math.max(0,state.money-120);state.wanted=0;if(player.inCar)exitCar();player.x=190;player.y=200;world.police=[];notify('Тебя вырубили. Потеряно $120');save()}
+function frame(time){const dt=Math.min(.04,(time-lastTime)/1000||0);lastTime=time;if(!gamePaused)update(dt);render();updateHud();requestAnimationFrame(frame)}
+function setupJoystick(){
+ const pad=$('joystick'),knob=$('joystick-knob');
+ const set=(x,y)=>{const max=39,len=Math.hypot(x,y)||1,k=Math.min(1,max/len);joystick.x=x*k/max;joystick.y=y*k/max;knob.style.transform='translate('+x*k+'px,'+y*k+'px)'};
+ pad.addEventListener('pointerdown',e=>{joystick.active=true;joystick.pointer=e.pointerId;pad.setPointerCapture(e.pointerId);const r=pad.getBoundingClientRect();set(e.clientX-r.left-r.width/2,e.clientY-r.top-r.height/2)});
+ pad.addEventListener('pointermove',e=>{if(!joystick.active||joystick.pointer!==e.pointerId)return;const r=pad.getBoundingClientRect();set(e.clientX-r.left-r.width/2,e.clientY-r.top-r.height/2)});
+ const release=e=>{if(joystick.pointer!==e.pointerId)return;joystick.active=false;joystick.pointer=null;set(0,0)};
+ pad.addEventListener('pointerup',release);pad.addEventListener('pointercancel',release);
+}
+setupJoystick();
+const sprintButton=$('sprint');
+sprintButton.addEventListener('pointerdown',e=>{e.preventDefault();sprintHeld=true;sprintButton.setPointerCapture(e.pointerId)});
+const stopSprint=()=>{sprintHeld=false};
+sprintButton.addEventListener('pointerup',stopSprint);sprintButton.addEventListener('pointercancel',stopSprint);sprintButton.addEventListener('lostpointercapture',stopSprint);
+$('interact').addEventListener('click',interact);$('attack').addEventListener('click',attack);
+addEventListener('keydown',e=>{const key=e.key.toLowerCase();keys.add(key);if(key==='e')interact();if(key===' '){e.preventDefault();attack()}if(key==='escape')closeModal()});
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+addEventListener('blur',()=>keys.clear());
+document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});
+if('serviceWorker' in navigator&&location.protocol!=='file:'){addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(error=>console.warn('Offline mode unavailable',error)))}
+$('loading').classList.add('done');setTimeout(()=>$('loading').remove(),400);
+updateHud();requestAnimationFrame(frame);
++Math.floor(state.money)+'</b><br>❤️ '+Math.ceil(state.health)+' &nbsp; ⚡ '+Math.ceil(state.stamina)+'<br>⭐ '+state.rep+' &nbsp; 🔫 '+state.ammo+'<br>☠ '+state.wanted+' / 5';
  const m=currentMission();$('mission-card').innerHTML=m?'<strong>'+m.title+'</strong>'+m.text:'<strong>СВОБОДНАЯ ИГРА</strong>Город открыт. Зарабатывай, развивай бизнес и исследуй районы.';
  const d=DISTRICTS.find(v=>state.unlocked.includes(v.id)&&player.x>=v.bounds.x&&player.x<v.bounds.x+v.bounds.w&&player.y>=v.bounds.y&&player.y<v.bounds.y+v.bounds.h)||DISTRICTS[0];$('district-tag').textContent=d.name;
 }
