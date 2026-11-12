@@ -1,4 +1,4 @@
-const CACHE='gcr-revival-v2';
+const CACHE='gcr-revival-v3';
 const CORE=['./','./index.html','./styles.css','./manifest.webmanifest','./src/main.js','./icon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
