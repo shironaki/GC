@@ -182,4 +182,5 @@ requestAnimationFrame(loop);
 addEventListener('beforeunload',save);
 })();
 </script>
+<script>if('serviceWorker' in navigator && location.protocol!=='file:'){addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}</script>
 </body></html>
