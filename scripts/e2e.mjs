@@ -33,6 +33,8 @@ try {
     return x[3]===255;
   });
   if (!(await page.locator('#sprint').isVisible())) throw new Error('Mobile sprint control is missing');
+  if (!(await page.locator('#minimap').isVisible())) throw new Error('City minimap is missing');
+  await page.waitForFunction(() => { const m=document.querySelector('#minimap'); return m.getContext('2d').getImageData(20,20,1,1).data[3] > 0; });
   await page.locator('#menu-open').click();
   await page.locator('#medkit').waitFor();
   await page.locator('#medkit').click();
