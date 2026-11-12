@@ -1,0 +1,12 @@
+{
+  "name": "Gangstar City: Revival",
+  "short_name": "Gangstar Revival",
+  "description": "Мобильная городская песочница в духе Gangstar City.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#10171b",
+  "theme_color": "#111820",
+  "lang": "ru"
+}
