@@ -151,12 +151,12 @@ function interact(){
  openBusiness(b);
 }
 function exitCar(){const car=world.cars.find(v=>v.id===player.inCar);if(!car)return;player.inCar=null;car.occupied=false;player.x=clamp(car.x+28,20,WORLD.w-20);player.y=car.y+18;notify('Ты вышел из машины')}
-function melee(g){if(dist(player,g)>100)return;g.hp-=34;player.attack=.24;state.wanted=Math.min(5,state.wanted+1);if(g.hp<=0){g.alive=false;state.kills++;state.money+=75;state.rep++;state.ammo+=2;notify('Противник повержен · +$75');if(state.mission===2)finishMission();else if(state.mission===4&&state.rep>=4)notify('Репутации достаточно — Downtown открыт')}else notify('Удар попал');save()}
+function melee(g){if(dist(player,g)>100)return;g.hp-=34;player.attack=.24;state.wanted=Math.min(5,state.wanted+1);if(g.hp<=0){g.alive=false;state.kills++;state.money+=75;state.ammo+=2;notify('Противник повержен · +$75');if(state.mission===2)finishMission();else state.rep++;}else notify('Удар попал');save()}
 function attack(){
  if(player.inCar){notify('Выйди из машины, чтобы атаковать');return}
  const gang=world.gangs.filter(g=>g.alive&&dist(player,g)<115).sort((a,b)=>dist(player,a)-dist(player,b))[0];
  if(gang){melee(gang);return}
- if(state.equipped==='Пистолет'&&state.ammo>0){state.ammo--;state.wanted=Math.min(5,state.wanted+1);const target=world.gangs.filter(g=>g.alive&&dist(player,g)<320).sort((a,b)=>dist(player,a)-dist(player,b))[0];if(target){target.hp-=48;if(target.hp<=0){target.alive=false;state.kills++;state.money+=75;state.rep++;if(state.mission===2)finishMission()}notify('Выстрел произведён')}else notify('Выстрел в воздух');save()}else notify('Нет патронов или оружие не экипировано')
+ if(state.equipped==='Пистолет'&&state.ammo>0){state.ammo--;state.wanted=Math.min(5,state.wanted+1);const target=world.gangs.filter(g=>g.alive&&dist(player,g)<320).sort((a,b)=>dist(player,a)-dist(player,b))[0];if(target){target.hp-=48;if(target.hp<=0){target.alive=false;state.kills++;state.money+=75;if(state.mission===2)finishMission();else state.rep++}notify('Выстрел произведён')}else notify('Выстрел в воздух');save()}else notify('Нет патронов или оружие не экипировано')
 }
 function openModal(content){$('modal-content').innerHTML=content;$('modal').hidden=false;gamePaused=true}
 function closeModal(){$('modal').hidden=true;gamePaused=false}
@@ -214,7 +214,7 @@ function updatePolice(dt,car){
  if(state.wanted>0&&Math.random()<dt*.22&&world.police.length<state.wanted*2){world.police.push({x:clamp(player.x+rand(-380,380),20,WORLD.w-20),y:clamp(player.y+rand(-380,380),20,WORLD.h-20),hp:70,phase:0})}
  for(let i=world.police.length-1;i>=0;i--){const cop=world.police[i],d=dist(player,cop),a=Math.atan2(player.y-cop.y,player.x-cop.x);cop.x+=Math.cos(a)*(car?1.3:.55);cop.y+=Math.sin(a)*(car?1.3:.55);cop.phase+=dt;if(d<24&&player.invulnerable<=0){state.health-=4;player.invulnerable=1;if(state.health<=0)knockOut()}if(state.wanted===0&&d>500)world.police.splice(i,1)}
 }
-function knockOut(){state.health=40;state.money=Math.max(0,state.money-120);state.wanted=0;player.x=190;player.y=200;if(player.inCar)exitCar();world.police=[];notify('Тебя вырубили. Потеряно $120');save()}
+function knockOut(){state.health=40;state.money=Math.max(0,state.money-120);state.wanted=0;if(player.inCar)exitCar();player.x=190;player.y=200;world.police=[];notify('Тебя вырубили. Потеряно $120');save()}
 function frame(time){const dt=Math.min(.04,(time-lastTime)/1000||0);lastTime=time;if(!gamePaused)update(dt);render();updateHud();requestAnimationFrame(frame)}
 function setupJoystick(){
  const pad=$('joystick'),knob=$('joystick-knob');
