@@ -48,7 +48,7 @@ try {
   await page.locator('#continue').click();
   await page.reload({waitUntil:'networkidle'});
   await page.waitForFunction(() => document.querySelector('#world')?.width > 0);
-  await page.evaluate(() => navigator.serviceWorker?.ready);
+  await page.evaluate(async () => { if ('serviceWorker' in navigator) await navigator.serviceWorker.ready; return true; });
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForFunction(() => !!navigator.serviceWorker?.controller);
   await page.context().setOffline(true);
