@@ -87,7 +87,7 @@ load();makeWorld();
 function applySavedWorld(){
  const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
  try{const data=JSON.parse(raw);for(const saved of data.buildings||[]){const b=world.buildings.find(v=>v.id===saved.id);if(b){b.owned=!!saved.owned;b.level=clamp(Number(saved.level)||1,1,10)}}
- for(const saved of data.cars||[]){const c=world.cars.find(v=>v.id===saved.id);if(c){c.x=saved.x;c.y=saved.y;c.hp=saved.hp}}
+ for(const saved of data.cars||[]){const c=world.cars.find(v=>v.id===saved.id);if(c){c.x=clamp(Number(saved.x)||c.x,20,WORLD.w-20);c.y=clamp(Number(saved.y)||c.y,20,WORLD.h-20);c.hp=clamp(Number(saved.hp)||100,0,100)}}
  }catch{}
 }
 applySavedWorld();
